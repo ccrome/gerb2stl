@@ -19,6 +19,7 @@ token_file_map = {}
 
 app.layout = html.Div([
     html.H1("Gerber to STL Converter"),
+    html.A("GitHub source code", href="https://github.com/ccrome/gerb2stl"),
     dcc.Upload(
         id='upload-gerber',
         children=html.Div(['Drag & Drop or ', html.A('Select a Gerber File')]),
