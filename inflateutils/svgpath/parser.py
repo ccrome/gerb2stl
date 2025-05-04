@@ -10,7 +10,7 @@ COMMANDS = set('MmZzLlHhVvCcSsQqTtAa')
 UPPERCASE = set('MZLHVCSQTA')
 
 COMMAND_RE = re.compile("([MmZzLlHhVvCcSsQqTtAa])")
-FLOAT_RE = re.compile("[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?")
+FLOAT_RE = re.compile(r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?")
 
 SVG_COLORS = {
 "aliceblue": (0.941176,0.972549,1),
@@ -590,7 +590,7 @@ def getPathsFromSVG(svg):
                     if tag.strip().lower().endswith("}href"):
                         link = tree.attrib[tag]
                         break
-                if link is None or link[0] is not '#':
+                if link is None or link[0] != '#':
                     raise KeyError
                 source = savedElements[link[1:]]
                 x = 0
