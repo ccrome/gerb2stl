@@ -27,6 +27,15 @@ python app.py
 
 Then open http://localhost:8080
 
+## Testing the docker image locally
+### Docker build & Run
+```bash
+docker build -t gerb2svg .
+docker run --rm -it -p8080:8080 gerb2svg
+```
+
+Then open http://localhost:8080
+
 ## ☁️ Deploying to Google Cloud Run
 
 ### Step 1: Set up Google Cloud Project
