@@ -6,10 +6,11 @@ import sys
 import getopt
 import cmath
 import math
+from pathlib import Path
 from inflateutils.exportmesh import *
 from inflateutils.formatdecimal import decimal
 from random import sample
-
+import argparse
 quiet = False
 
 def closed(path):
@@ -275,155 +276,69 @@ def getBezier(path,offset,cpMode):
     addCoords("N",last)
     
     return ",".join(b)
-    
-if __name__ == '__main__':
-    outfile = None
-    doRibbons = False
-    doPolygons = False
-    baseName = "svg"
-    tolerance = 0.1
-    width = 0
-    height = 10
-    colors = True
-    centerPage = False
-    align = "center"
-    cpMode = "none"
-    
-    def help(exitCode=0):
-        help = """python svg2scad.py [options] filename.svg
-options:
---help:         this message
---align=mode:   object alignment mode: center [default], lowerleft, absolute
---bezier=mode:  control point style: none [no Bezier library needed], absolute, offset or polar 
---tolerance=x:  when linearizing paths, keep them within x millimeters of correct position (default: 0.1)
---ribbons:      make ribbons out of outlined paths
---polygons:     make polygons out of shaded paths
---width:        ribbon width override
---height:       ribbon or polygon height in millimeters; if zero, they're two-dimensional (default: 10)
---no-colors:    omit colors from SVG file (default: include colors)
---name=abc:     make all the OpenSCAD variables/module names contain abc (e.g., center_abc) (default: svg)
---center-page:  put the center of the SVG page at (0,0,0) in the OpenSCAD file
---output=file:  write output to file (default: stdout)
-"""
-        if exitCode:
-            sys.stderr.write(help + "\n")
-        else:
-            print(help)
-        sys.exit(exitCode)
-    
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "h", 
-                        ["help", "tolerance=", "ribbons", "polygons", "width=", "xpolygons=", "xribbons=",
-                        "height=", "tab=", "name=", "center-page", "xcenter-page=", "no-colors", "xcolors=",
-                        "bezier=", "align="])
 
-        if len(args) == 0:
-            raise getopt.GetoptError("invalid commandline")
+def parse_args():
+    parser = argparse.ArgumentParser(description="Convert SVG to OpenSCAD geometry.")
+    parser.add_argument("filename", help="Input SVG file")
+    parser.add_argument("--align", choices=["center", "lowerleft", "absolute"], default="center", help="Object alignment mode")
+    parser.add_argument("--bezier", choices=["none", "absolute", "offset", "polar"], default="none", help="Bezier control point style")
+    parser.add_argument("--tolerance", type=float, default=0.1, help="Linearization tolerance in mm")
+    parser.add_argument("--ribbons", action="store_true", help="Make ribbons out of outlined paths")
+    parser.add_argument("--polygons", action="store_true", help="Make polygons out of shaded paths")
+    parser.add_argument("--width", type=float, default=0, help="Ribbon width override")
+    parser.add_argument("--height", type=float, default=10, help="Extrusion height (0 = 2D)")
+    parser.add_argument("--no-colors", dest="colors", action="store_false", help="Omit colors from output")
+    parser.add_argument("--name", default="svg", help="Base name for OpenSCAD variables/modules")
+    parser.add_argument("--center-page", action="store_true", help="Put the center of the SVG at (0,0,0)")
+    parser.add_argument("-o", "--output", type=Path, help="Output file to write to.")
+    args = parser.parse_args()
+    if args.output is not None and args.output.exists():
+        print(f"{args.output} already exists.  not overwriting!")
+        exit(1)
+    return args
 
-        i = 0
-        while i < len(opts):
-            opt,arg = opts[i]
-            if opt in ('-h', '--help'):
-                help()
-                sys.exit(0)
-            elif opt == '--tolerance':
-                tolerance = float(arg)
-            elif opt == '--width':
-                width = float(arg)
-            elif opt == '--height':
-                height = float(arg)
-            elif opt == '--name':
-                baseName = arg
-            elif opt == "--ribbons":
-                doRibbons = True
-            elif opt == "--bezier":
-                cpMode = arg
-            elif opt == "--align":
-                align = arg
-            elif opt == "--xabsolute":
-                absolute = (arg == "true" or arg == "1")
-            elif opt == "--xribbons":
-                doRibbons = (arg == "true" or arg == "1")
-            elif opt == "--polygons":
-                doPolygons = True
-            elif opt == "--xpolygons":
-                doPolygons = (arg == "true" or arg == "1")
-            elif opt == "--center-page":
-                centerPage = True
-            elif opt == "--xcenter-page":
-                centerPage = (arg == "true" or arg == "1")
-            elif opt == "--xcolors":
-                colors = (arg == "true" or arg == "1")
-            elif opt == "--no-colors":
-                colors = False
-                
-            i += 1
-                
-    except getopt.GetoptError as e:
-        sys.stderr.write(str(e)+"\n")
-        help(exitCode=1)
-        sys.exit(2)
-        
-    paths, lowerLeft, upperRight = parser.getPathsFromSVGFile(args[0])
-    
-    if centerPage:
-        offset = -0.5*(lowerLeft+upperRight)
-    else:
-        offset = 0
-        
-    polygons = extractPaths(paths, offset, tolerance=tolerance, baseName=baseName, colors=colors, 
-                    levels=doPolygons, align=align)
-    
+def generate_scad_code(args, polygons, offset):
     scad = ""
-    
-    if cpMode[0] != 'n':
+    if args.bezier != 'none':
         scad += "use <bezier.scad>; // download from https://www.thingiverse.com/thing:2207518\n\n"
-        scad += "bezier_precision = -%s;\n" % decimal(tolerance)
-
-    if height > 0:
-        if doPolygons:
-            scad += "polygon_height_%s = %s;\n" % (baseName, decimal(height))
-        if doRibbons:
-            scad += "ribbon_height_%s = %s;\n" % (baseName, decimal(height))
-        
-    if width > 0:
-        scad += "width_%s = %s;\n" % (baseName, decimal(width))
-        
+        scad += "bezier_precision = -%s;\n" % decimal(args.tolerance)
+    if args.height > 0:
+        if args.polygons:
+            scad += "polygon_height_%s = %s;\n" % (args.name, decimal(args.height))
+        if args.ribbons:
+            scad += "ribbon_height_%s = %s;\n" % (args.name, decimal(args.height))
+    if args.width > 0:
+        scad += "width_%s = %s;\n" % (args.name, decimal(args.width))
     if len(scad):
         scad += "\n"
-        
-    def polyName(i):
-        return baseName + "_" + str(i+1)
-        
-    def subpathName(i,j):
-        return polyName(i) + "_" + str(j+1)
-        
-    for i,polygon in enumerate(polygons):
-        if (align[0] != 'a'):
-            scad += "position_%s = [%s,%s];\n" % (polyName(i), decimal(polygon.getAnchor(align).real), decimal(polygon.getAnchor(align).imag))
+
+    def polyName(i): return args.name + "_" + str(i + 1)
+    def subpathName(i, j): return polyName(i) + "_" + str(j + 1)
+
+    for i, polygon in enumerate(polygons):
+        if args.align[0] != 'a':
+            scad += "position_%s = [%s,%s];\n" % (polyName(i), decimal(polygon.getAnchor(args.align).real), decimal(polygon.getAnchor(args.align).imag))
         scad += "size_%s = [%s,%s];\n" % (polyName(i), decimal(polygon.bounds[2]-polygon.bounds[0]), decimal(polygon.bounds[3]-polygon.bounds[1]))
         scad += "stroke_width_%s = %s;\n" % (polyName(i), decimal(polygon.strokeWidth))
-        if colors:
+        if args.colors:
             scad += "color_%s = %s;\n" % (polyName(i), describeColor(polygon.color))
             scad += "fillcolor_%s = %s;\n" % (polyName(i), describeColor(polygon.fillColor))
-        
-    for i,polygon in enumerate(polygons):
+
+    for i, polygon in enumerate(polygons):
         scad += "// paths for %s\n" % polyName(i)
-        for j,points in enumerate(polygon.pointLists):
-            scad += "points_" + subpathName(i,j) + " = "
-            b = cpMode[0] != 'n' and getBezier(points.originalPath,-polygon.getAnchor(align),cpMode)
+        for j, points in enumerate(polygon.pointLists):
+            scad += "points_" + subpathName(i, j) + " = "
+            b = args.bezier != 'none' and getBezier(points.originalPath, -polygon.getAnchor(args.align), args.bezier)
             if b:
-                scad += "Bezier(["+b+"],precision=bezier_precision);"
+                scad += "Bezier([" + b + "],precision=bezier_precision);"
             else:
-                scad += "[ " + ','.join('[%s,%s]' % (decimal(point.real),decimal(point.imag)) for point in points) + " ];\n"
+                scad += "[ " + ','.join('[%s,%s]' % (decimal(point.real), decimal(point.imag)) for point in points) + " ];\n"
         scad += "\n"
 
     objectNames = []
-        
-    if doRibbons:
+    if args.ribbons:
         scad += """module ribbon(points, thickness=1) {
     p = points;
-    
     union() {
         for (i=[1:len(p)-1]) {
             hull() {
@@ -434,50 +349,52 @@ options:
     }
 }
 
-""" 
+"""
         objectNames.append("ribbon")
-        
-        for i,polygon in enumerate(polygons):
-            scad += "module ribbon_%s(width=%s) {\n" % (polyName(i),("width_"+baseName) if width else ("stroke_width_"+polyName(i)))
+        for i, polygon in enumerate(polygons):
+            scad += "module ribbon_%s(width=%s) {\n" % (polyName(i), ("width_" + args.name) if args.width else ("stroke_width_" + polyName(i)))
             for j in range(len(polygon.pointLists)):
-                scad += "  ribbon(points_%s, thickness=width);\n" % subpathName(i,j)
+                scad += "  ribbon(points_%s, thickness=width);\n" % subpathName(i, j)
             scad += "}\n\n"
 
-    if doPolygons:    
+    if args.polygons:
         objectNames.append("polygon")
-    
-        for i,polygon in enumerate(polygons):
-            scad += "module polygon_%s() {\n " % polyName(i)
-            scad += "render(convexity=4) "
-            scad += "{\n"
-            scad += toNestedPolygons(polygon.levels, lambda j : "points_" + subpathName(i,j))
+        for i, polygon in enumerate(polygons):
+            scad += "module polygon_%s() {\n render(convexity=4) {\n" % polyName(i)
+            scad += toNestedPolygons(polygon.levels, lambda j: "points_" + subpathName(i, j))
             scad += " }\n}\n\n"
-            
-    if height > 0:
-        polygonExtrude = "linear_extrude(height=polygon_height_%s) " % baseName
-        ribbonExtrude = "linear_extrude(height=ribbon_height_%s) " % baseName
+
+    if args.height > 0:
+        polygonExtrude = "linear_extrude(height=polygon_height_%s) " % args.name
+        ribbonExtrude = "linear_extrude(height=ribbon_height_%s) " % args.name
     else:
-        polygonExtrude = ""
-        ribbonExtrude = ""
+        polygonExtrude = ribbonExtrude = ""
 
     for objectName in objectNames:
         for i in range(len(polygons)):
-            c = "" if not colors else "//"
-            if colors and objectName == 'polygon' and polygons[i].fillColor:
+            c = "" if not args.colors else "//"
+            if args.colors and objectName == 'polygon' and polygons[i].fillColor:
                 c = "color(fillcolor_%s) " % polyName(i)
-            elif colors and objectName == 'ribbon' and polygons[i].color:
+            elif args.colors and objectName == 'ribbon' and polygons[i].color:
                 c = "color(color_%s) " % polyName(i)
-
-            if align[0] == 'a':
-                translate = ""
-            else:
-                translate = "translate(position_%s) " % polyName(i)
-
+            translate = "" if args.align[0] == 'a' else "translate(position_%s) " % polyName(i)
             extrude = polygonExtrude if objectName == 'polygon' else ribbonExtrude
-                
             scad += c + extrude + translate + "%s_%s();\n" % (objectName, polyName(i))
-            
-    if outfile:
-        with open(outfile, "w") as f: f.write(scad)
+
+    return scad
+
+def main():
+    args = parse_args()
+    paths, lowerLeft, upperRight = parser.getPathsFromSVGFile(args.filename)
+    offset = -0.5 * (lowerLeft + upperRight) if args.center_page else 0
+    polygons = extractPaths(paths, offset, tolerance=args.tolerance, baseName=args.name,
+                            colors=args.colors, levels=args.polygons, align=args.align)
+    scad = generate_scad_code(args, polygons, offset)
+    if args.output is None:
+        print(scad)
     else:
-        print(scad)    
+        with args.output.open('w') as f:
+            f.write(scad)
+
+if __name__ == '__main__':
+    main()
