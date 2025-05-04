@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <_name>OpenSCAD Inflation Export</_name>
+  <id>mobi.omegacentauri.inflatemesh</id>
+  <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
+  <dependency type="executable" location="extensions">inflatemesh.py</dependency>
+  <output>
+    <extension>.scad</extension>
+    <mimetype>text/plain</mimetype>
+    <_filetypename>OpenSCAD inflated file (*.scad)</_filetypename>
+    <_filetypetooltip>Export an OpenSCAD inflation of closed paths</_filetypetooltip>
+    <dataloss>true</dataloss>
+  </output>
+  <param name="tab" type="notebook">
+    <page name="scad" _gui-text="Settings ">
+      <param name="resolution" type="int" min="2" max="1000" _gui-text="Approx. grid resolution:" _gui-description="Approximate mesh resolution (Default: 15)">15</param>
+      <param name="flatness" type="float" min="0.00" max="10.0" precision="3" _gui-text="Flatness (0-10):" _gui-description="Flatness of top for inflation (Default: 0)">0</param>
+      <param name="exponent" type="float" min="0.00001" max="10.0" precision="3" _gui-text="Exponent (0.00001-10):" _gui-description="Exponent controlling shape roundness (Default: 2)">2</param>
+      <param name="height" type="float" min="0.01" max="1000000.0" precision="3" _gui-text="Height (mm):" _gui-description="Height of inflated mesh (Default: 10)">10</param>
+      <param name="noise" type="float" min="0.00" max="1000000.0" precision="3" _gui-text="Noise height (mm):" _gui-description="Maximum height of added noise (Default: 0)">0</param>
+      <param name="noise-exponent" type="float" min="0.00" max="10.0" precision="3" _gui-text="Noise exponent (0-10):" _gui-description="Noise exponent, larger values being smoother (Default: 1.25)">1.25</param>
+      <param name="mesh" type="enum" _gui-text="Mesh type:" _gui-description="Mesh type (Default: hexagonal)">
+        <item value="hexagonal">hexagonal</item>
+        <item value="rectangular">rectangular</item>
+      </param>
+      <param name="xtwo-sided" type="boolean" _gui-text="Two sided" _gui-description="Two sided inflation">0</param>
+      <param name="xcenter-page" type="boolean" _gui-text="Center page at (0,0,0)" _gui-description="This centers the center of the Inkscape page at the origin in the OpenSCAD file.">1</param>
+      <param name="xcolors" type="boolean" _gui-text="Include colors" _gui-description="This includes the colors from the Inkscape file.">1</param>
+      <param name="name" type="string" _gui-text="OpenSCAD object identifier" _gui-description="All the variables will be tagged with what you put here.">svg</param>
+      </param>
+    </page>
+  <script>
+      <command reldir="extensions" interpreter="python">inflatemesh.py</command>
+  </script>
+</inkscape-extension>
