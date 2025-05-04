@@ -280,13 +280,13 @@ def getBezier(path,offset,cpMode):
 def parse_args():
     parser = argparse.ArgumentParser(description="Convert SVG to OpenSCAD geometry.")
     parser.add_argument("filename", help="Input SVG file")
-    parser.add_argument("--align", choices=["center", "lowerleft", "absolute"], default="center", help="Object alignment mode")
-    parser.add_argument("--bezier", choices=["none", "absolute", "offset", "polar"], default="none", help="Bezier control point style")
-    parser.add_argument("--tolerance", type=float, default=0.1, help="Linearization tolerance in mm")
-    parser.add_argument("--ribbons", action="store_true", help="Make ribbons out of outlined paths")
-    parser.add_argument("--polygons", action="store_true", help="Make polygons out of shaded paths")
-    parser.add_argument("--width", type=float, default=0, help="Ribbon width override")
-    parser.add_argument("--height", type=float, default=10, help="Extrusion height (0 = 2D)")
+    parser.add_argument("--align", choices=["center", "lowerleft", "absolute"], default="center", help="Object alignment mode, default=center")
+    parser.add_argument("--bezier", choices=["none", "absolute", "offset", "polar"], default="none", help="Bezier control point style, default=none")
+    parser.add_argument("--tolerance", type=float, default=0.1, help="Linearization tolerance in mm, default=0.1")
+    parser.add_argument("--no-ribbons", action="store_false", help="Make ribbons out of outlined paths")
+    parser.add_argument("--no-polygons", action="store_false", help="Make polygons out of shaded paths")
+    parser.add_argument("--width", type=float, default=0, help="Ribbon width override, default=0")
+    parser.add_argument("--height", type=float, default=0.05, help="Extrusion height (0 = 2D), in mm, default=0.05")
     parser.add_argument("--no-colors", dest="colors", action="store_false", help="Omit colors from output")
     parser.add_argument("--name", default="svg", help="Base name for OpenSCAD variables/modules")
     parser.add_argument("--center-page", action="store_true", help="Put the center of the SVG at (0,0,0)")
@@ -303,9 +303,9 @@ def generate_scad_code(args, polygons, offset):
         scad += "use <bezier.scad>; // download from https://www.thingiverse.com/thing:2207518\n\n"
         scad += "bezier_precision = -%s;\n" % decimal(args.tolerance)
     if args.height > 0:
-        if args.polygons:
+        if args.no_polygons:
             scad += "polygon_height_%s = %s;\n" % (args.name, decimal(args.height))
-        if args.ribbons:
+        if args.no_ribbons:
             scad += "ribbon_height_%s = %s;\n" % (args.name, decimal(args.height))
     if args.width > 0:
         scad += "width_%s = %s;\n" % (args.name, decimal(args.width))
@@ -336,7 +336,7 @@ def generate_scad_code(args, polygons, offset):
         scad += "\n"
 
     objectNames = []
-    if args.ribbons:
+    if args.no_ribbons:
         scad += """module ribbon(points, thickness=1) {
     p = points;
     union() {
@@ -357,7 +357,7 @@ def generate_scad_code(args, polygons, offset):
                 scad += "  ribbon(points_%s, thickness=width);\n" % subpathName(i, j)
             scad += "}\n\n"
 
-    if args.polygons:
+    if args.no_polygons:
         objectNames.append("polygon")
         for i, polygon in enumerate(polygons):
             scad += "module polygon_%s() {\n render(convexity=4) {\n" % polyName(i)
@@ -388,7 +388,7 @@ def main():
     paths, lowerLeft, upperRight = parser.getPathsFromSVGFile(args.filename)
     offset = -0.5 * (lowerLeft + upperRight) if args.center_page else 0
     polygons = extractPaths(paths, offset, tolerance=args.tolerance, baseName=args.name,
-                            colors=args.colors, levels=args.polygons, align=args.align)
+                            colors=args.colors, levels=args.no_polygons, align=args.align)
     scad = generate_scad_code(args, polygons, offset)
     if args.output is None:
         print(scad)
